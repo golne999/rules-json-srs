@@ -1,1 +1,46 @@
+name: Update WeChat SRS
 
+on:
+  schedule:
+    - cron: '0 0 * * *'     # 每天 0 点自动执行
+  workflow_dispatch:         # 也可手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml requests
+
+      - name: Run YAML → JSON
+        run: |
+          python convert.py
+
+      - name: Install sing-box
+        run: |
+          # 下载官方 Linux AMD64 版，你也可换成其他版本
+          wget https://github.com/SagerNet/sing-box/releases/download/v1.11.0/sing-box-1.11.0-linux-amd64.tar.gz
+          tar -xf sing-box-1.11.0-linux-amd64.tar.gz
+          chmod +x sing-box-1.11.0-linux-amd64/sing-box
+          sudo mv sing-box-1.11.0-linux-amd64/sing-box /usr/local/bin/
+
+      - name: Compile JSON → SRS
+        run: |
+          sing-box rule-set compile --output wechat.srs wechat.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add wechat.json wechat.srs
+          git diff --cached --quiet || git commit -m "Update wechat ruleset from latest YAML"
+          git push
